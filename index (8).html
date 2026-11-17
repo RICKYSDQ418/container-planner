@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>装柜成本计算器</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: iOS grouped list — frosted top bar, large page title, rounded inset cards on a grouped background; phones get a bottom tab bar */
+:root{
+  --bg:#f2f2f7;--panel:#ffffff;--bg2:#f2f2f7;--ink:#1c1c1e;--muted:rgba(60,60,67,.6);--line:rgba(60,60,67,.14);
+  --fill:rgba(118,118,128,.12);--fill2:rgba(120,120,128,.2);--soft:rgba(118,118,128,.08);
+  --accent:#007aff;--accent-ink:#ffffff;--good:#34c759;--warn:#ff9500;--bad:#ff3b30;--indigo:#5856d6;
+  --bar-bg:rgba(249,249,249,.82);--bar-solid:rgba(249,249,249,.96);--seg-on:#ffffff;--knob:#ffffff;--field:rgba(118,118,128,.12);
+  --warn-bg:rgba(255,149,0,.12);--ok-bg:rgba(52,199,89,.13);--bad-bg:rgba(255,59,48,.11);
+  --warn-ink:#a35a00;--ok-ink:#1d7a37;--bad-ink:#c4261d;
+  --scrim:rgba(0,0,0,.32);--stage-a:#fbfbfd;--stage-b:#e5e5ea;--stage-edge:#3a3a3c;--stage-floor:#c7c7cc;--stage-ink:#8e8e93;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 14px rgba(0,0,0,.04);
+  --r:14px;--mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",sans-serif;
+  --font-d:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-r:ui-rounded,"SF Pro Rounded",-apple-system,"PingFang SC",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#000000;--panel:#1c1c1e;--bg2:#2c2c2e;--ink:#ffffff;--muted:rgba(235,235,245,.6);--line:rgba(84,84,88,.6);
+  --fill:rgba(118,118,128,.24);--fill2:rgba(120,120,128,.36);--soft:rgba(118,118,128,.18);
+  --accent:#0a84ff;--accent-ink:#ffffff;--good:#30d158;--warn:#ff9f0a;--bad:#ff453a;--indigo:#5e5ce6;
+  --bar-bg:rgba(22,22,24,.78);--bar-solid:rgba(22,22,24,.96);--seg-on:#636366;--knob:#ffffff;--field:rgba(118,118,128,.24);
+  --warn-bg:rgba(255,159,10,.16);--ok-bg:rgba(48,209,88,.16);--bad-bg:rgba(255,69,58,.16);
+  --warn-ink:#ffb340;--ok-ink:#5ee07f;--bad-ink:#ff7a70;
+  --scrim:rgba(0,0,0,.55);--stage-a:#2c2c2e;--stage-b:#1c1c1e;--stage-edge:#d1d1d6;--stage-floor:#48484a;--stage-ink:#aeaeb2;
+  --shadow:none;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#000000;--panel:#1c1c1e;--bg2:#2c2c2e;--ink:#ffffff;--muted:rgba(235,235,245,.6);--line:rgba(84,84,88,.6);
+  --fill:rgba(118,118,128,.24);--fill2:rgba(120,120,128,.36);--soft:rgba(118,118,128,.18);
+  --accent:#0a84ff;--accent-ink:#ffffff;--good:#30d158;--warn:#ff9f0a;--bad:#ff453a;--indigo:#5e5ce6;
+  --bar-bg:rgba(22,22,24,.78);--bar-solid:rgba(22,22,24,.96);--seg-on:#636366;--knob:#ffffff;--field:rgba(118,118,128,.24);
+  --warn-bg:rgba(255,159,10,.16);--ok-bg:rgba(48,209,88,.16);--bad-bg:rgba(255,69,58,.16);
+  --warn-ink:#ffb340;--ok-ink:#5ee07f;--bad-ink:#ff7a70;
+  --scrim:rgba(0,0,0,.55);--stage-a:#2c2c2e;--stage-b:#1c1c1e;--stage-edge:#d1d1d6;--stage-floor:#48484a;--stage-ink:#aeaeb2;
+  --shadow:none;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bar-bg);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+
+/* 顶栏（毛玻璃） */
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;align-items:center;gap:16px;min-height:52px;padding-block:8px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:var(--bar-bg);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--line)}
+header .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;white-space:nowrap}
+header .brand i{width:28px;height:28px;border-radius:7px;background:linear-gradient(160deg,#5ac8fa,#007aff);display:grid;place-items:center;flex:none}
+header .brand i svg{width:17px;height:17px;stroke:#fff}
+/* 桌面：分段控件式标签 */
+nav{display:flex;margin-left:auto;background:var(--fill);border-radius:9px;padding:2px;gap:0}
+nav button{display:flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--ink);font:inherit;font-size:13px;font-weight:500;padding:6px 14px;border-radius:7px;cursor:pointer;transition:background .2s}
+nav button svg{width:16px;height:16px;stroke:currentColor;opacity:.75}
+nav button.on{background:var(--seg-on);box-shadow:0 1px 3px rgba(0,0,0,.12),0 0 0 .5px rgba(0,0,0,.04);font-weight:600}
+
+main{max-width:1280px;margin:0 auto;padding-block:8px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.tab{display:none}.tab.on{display:block;animation:fadein .25s ease}
+@keyframes fadein{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.tab.on{animation:none}}
+.ltitle{font:700 34px/1.15 var(--font-d);letter-spacing:.01em;margin:14px 4px 4px;text-wrap:balance}
+.lsub{color:var(--muted);font-size:15px;margin:0 4px 18px}
+
+/* 卡片 */
+.card{background:var(--panel);border-radius:var(--r);padding:18px;margin-bottom:18px;box-shadow:var(--shadow)}
+.card h2{font:600 17px/1.3 var(--font-d);margin:0 0 14px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.card h2 .hint{flex-basis:100%;font:400 13px/1.4 var(--font);color:var(--muted);letter-spacing:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:minmax(360px,1fr) minmax(420px,1.3fr);gap:18px}
+.grid2>*{min-width:0}
+@media(max-width:980px){.grid2{grid-template-columns:1fr}}
+
+/* 表格：iOS 列表式，发丝分隔线 */
+.scroll{overflow:auto;max-width:100%;margin:0 -18px;padding:0 18px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px 8px;border-bottom:.5px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+th{color:var(--muted);font-weight:500;font-size:12px;letter-spacing:.02em;background:var(--panel);position:sticky;top:0;border-bottom:.5px solid var(--line)}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.sum td{font-weight:600;background:var(--soft)}
+td.unplaced{color:var(--bad);font-weight:600}
+
+/* 输入 */
+input,select{font:inherit;font-size:15px;border:0;border-radius:8px;padding:7px 10px;background:var(--field);color:var(--ink);min-width:0;outline:none;transition:box-shadow .15s}
+select{-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238e8e93' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+input::placeholder{color:var(--muted)}
+input[type=number]{width:84px;text-align:right;font-variant-numeric:tabular-nums}
+input.w50{width:62px}input.w120{width:124px}input.w160{width:180px}input.w200{width:220px}
+input:focus,select:focus{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+input[type=color]{-webkit-appearance:none;appearance:none;width:24px;height:24px;padding:0;border-radius:50%;background:none;cursor:pointer}
+input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+input[type=color]::-webkit-color-swatch{border:0;border-radius:50%}
+input[type=color]::-moz-color-swatch{border:0;border-radius:50%}
+/* iOS 开关 */
+input[type=checkbox]{-webkit-appearance:none;appearance:none;width:42px;height:26px;border-radius:13px;background:var(--fill2);position:relative;cursor:pointer;flex:none;padding:0;transition:background .2s;vertical-align:middle}
+input[type=checkbox]::before{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:var(--knob);box-shadow:0 2px 4px rgba(0,0,0,.2);transition:transform .2s cubic-bezier(.3,.7,.4,1)}
+input[type=checkbox]:checked{background:var(--good)}
+input[type=checkbox]:checked::before{transform:translateX(16px)}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
+label.f>span{white-space:nowrap;padding-left:2px}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;border:0;background:var(--fill);color:var(--accent);border-radius:10px;padding:8px 14px;cursor:pointer;font:inherit;font-size:15px;font-weight:500;text-decoration:none;transition:opacity .15s,transform .1s}
+.btn:hover{opacity:.85}.btn:active{transform:scale(.97);opacity:.7}
+.btn.pri{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.sm{padding:4px 10px;font-size:13px;border-radius:8px}
+.btn.del{color:var(--bad)}
+.btn:disabled{opacity:.5}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 分段控件 */
+.seg{display:inline-flex;background:var(--fill);border-radius:9px;padding:2px}
+.seg button{border:0;background:transparent;color:var(--ink);padding:6px 14px;cursor:pointer;font:inherit;font-size:13px;font-weight:500;border-radius:7px;transition:background .2s}
+.seg button.on{background:var(--seg-on);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600}
+
+/* 标记、色块 */
+.swatch{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:0;margin-right:8px}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;background:var(--fill);color:var(--muted);letter-spacing:0}
+.badge.warn{background:var(--warn-bg);color:var(--warn-ink)}.badge.ok{background:var(--ok-bg);color:var(--ok-ink)}.badge.bad{background:var(--bad-bg);color:var(--bad-ink)}
+
+/* 数字卡片 */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--bg2);border-radius:12px;padding:12px 14px}
+.kpi .l{font-size:12px;color:var(--muted);font-weight:500}
+.kpi .v{font:600 22px/1.25 var(--font-r);font-variant-numeric:tabular-nums;margin-top:2px;letter-spacing:-.01em}
+.kpi .s{font-size:11px;color:var(--muted);margin-top:1px}
+.bar{height:6px;background:var(--fill);border-radius:3px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .5s ease}
+.bar.w i{background:var(--indigo)}.bar.v i{background:var(--good)}
+
+/* 3D 舞台 */
+#view3d{width:100%;height:440px;border-radius:12px;background:linear-gradient(var(--stage-a),var(--stage-b));color:var(--stage-ink);position:relative;overflow:hidden}
+#view3d canvas{display:block}
+#view3d .tip{position:absolute;left:12px;bottom:10px;font-size:11px;color:inherit}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:13px}
+.note{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.55}
+.note b{color:var(--ink);font-weight:600}
+.msg{padding:11px 14px;border-radius:12px;margin:10px 0 0;font-size:14px}
+.msg.warn{background:var(--warn-bg);color:var(--warn-ink)}.msg.bad{background:var(--bad-bg);color:var(--bad-ink)}.msg.ok{background:var(--ok-bg);color:var(--ok-ink)}
+.hsres{max-height:280px;overflow:auto;border-radius:12px;margin-top:10px;background:var(--bg2)}
+.hsres:empty{display:none}
+.hsres div{padding:10px 14px;border-bottom:.5px solid var(--line);cursor:pointer;white-space:normal}
+.hsres div:last-child{border-bottom:0}
+.hsres div:hover{background:var(--fill)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono);font-size:13px}
+a.btn{text-decoration:none}
+
+/* iOS 风格弹窗 */
+#modal{position:fixed;inset:0;z-index:100;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:16px;animation:fadein .18s ease}
+#modal .mbox{background:var(--bar-bg);-webkit-backdrop-filter:saturate(180%) blur(30px);backdrop-filter:saturate(180%) blur(30px);color:var(--ink);border-radius:14px;width:100%;max-width:400px;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+#modal h3{margin:0;padding:20px 18px 4px;font:600 17px/1.3 var(--font-d);text-align:center}
+#modal .mbody{padding:4px 18px 16px;overflow:auto;font-size:14px;text-align:center;white-space:pre-wrap}
+#modal .mbody .note{text-align:center}
+#modal .mbody textarea{width:100%;min-height:180px;font:12px/1.45 var(--mono);border:0;border-radius:10px;padding:10px;background:var(--field);color:var(--ink);white-space:pre;text-align:left}
+#modal .mbody input{width:100%;font-size:16px;padding:10px;text-align:left;background:var(--panel)}
+#modal .mlist{display:flex;flex-direction:column;gap:0;white-space:normal;margin:4px -18px -16px;border-top:.5px solid var(--line)}
+#modal .mlist button{border-radius:0;background:transparent;border-bottom:.5px solid var(--line);padding:13px;font-size:16px;font-weight:400}
+#modal .mbtns{display:flex;border-top:.5px solid var(--line)}
+#modal .mbtns .btn{flex:1;border-radius:0;background:transparent;color:var(--accent);font-size:17px;font-weight:400;padding:13px 8px}
+#modal .mbtns .btn+.btn{border-left:.5px solid var(--line)}
+#modal .mbtns .btn.pri{font-weight:600;background:transparent;color:var(--accent)}
+#modal .mbtns .btn:active{background:var(--fill);transform:none}
+
+/* 手机：底部标签栏 */
+@media(max-width:700px){
+  header{justify-content:center;min-height:44px;-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--bar-solid)}
+  header .brand{font-size:16px}
+  header .brand i{display:none}
+  nav{position:fixed;left:0;right:0;bottom:0;margin:0;border-radius:0;padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));
+    background:var(--bar-bg);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line);justify-content:space-around;z-index:40}
+  nav button{flex-direction:column;gap:2px;font-size:10px;font-weight:500;padding:4px 6px;color:var(--muted);flex:1;background:transparent!important;box-shadow:none!important}
+  nav button svg{width:24px;height:24px;opacity:1}
+  nav button.on{color:var(--accent)}
+  main{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  .ltitle{font-size:30px;margin-top:8px}
+  input,select{font-size:16px}
+  input[type=number]{width:76px}
+  #view3d{height:320px}
+  .card{padding:14px;border-radius:12px}
+  .scroll{margin:0 -14px;padding:0 14px}
+  .kpi .v{font-size:19px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><i><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><path d="M7 9v6M10.5 9v6M14 9v6M17.5 9v6"/></svg></i>装柜计算器</div>
+  <nav id="nav">
+    <button data-t="products" class="on"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg><span>货物库</span></button>
+    <button data-t="plan"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><path d="M7 9v6M10.5 9v6M14 9v6M17.5 9v6"/></svg><span>装柜</span></button>
+    <button data-t="cost"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9.2c-.5-1-1.6-1.6-3-1.6-1.8 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2-1.5 0-2.6-.6-3.1-1.7M12 6v1.6M12 16.6V18"/></svg><span>成本</span></button>
+    <button data-t="settings"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>设置</span></button>
+  </nav>
+</header>
+<main>
+
+<!-- ============ 货物库 ============ -->
+<section class="tab on" id="tab-products">
+  <h1 class="ltitle">货物库</h1><p class="lsub">整柜配货 · 3D 摆放 · 运费分摊 · 落地成本</p>
+  <div class="card">
+    <h2>我的货物 <span class="hint">每种货录一次，单位、币种可以各自选；数据自动保存在本机浏览器</span></h2>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn pri" id="addProd">＋ 新增货物</button>
+      <span class="note" style="margin:0">尺寸填 <b>外箱/捆/托</b> 的尺寸，重量填 <b>单箱毛重</b>，价格填 <b>单箱价格</b>。</span>
+    </div>
+    <div class="scroll"><table id="prodTable"></table></div>
+  </div>
+  <div class="card">
+    <h2>HS 编码查询 <span class="hint">输入编码或中文/英文关键词</span></h2>
+    <div class="row">
+      <input id="hsQuery" class="w200" placeholder="例如 6807 或 沥青瓦">
+      <a class="btn" id="hsOfficial" href="https://www.cbsa-asfc.gc.ca/trade-commerce/tariff-tarif/menu-eng.html" target="_blank" rel="noopener">去 CBSA 官方税则核实 ↗</a>
+      <a class="btn" id="hsFinder" href="https://www.tariffinder.ca/en/" target="_blank" rel="noopener">Canada Tariff Finder ↗</a>
+    </div>
+    <div id="hsResults" class="hsres"></div>
+    <div class="note">内置的是常见建材的编码说明和<b>参考</b>税率（MFN，中国货适用），点一行可套用到货物。实际以 CBSA 税则为准；你核实后改过的税率会存进“我的 HS 库”，下次同编码自动带出。钢、铝制品（72/73/76 章）还可能有 25% 附加税或反倾销税，要单独核实。</div>
+  </div>
+</section>
+
+<!-- ============ 装柜方案 ============ -->
+<section class="tab" id="tab-plan">
+  <h1 class="ltitle">装柜方案</h1><p class="lsub">选柜型、选货，让电脑排出最满的组合</p>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <label class="f"><span>柜型</span><select id="ctSel"></select></label>
+        <label class="f"><span>模式</span>
+          <div class="seg" id="modeSeg"><button data-m="auto" class="on">电脑自动配货</button><button data-m="manual">我自己配</button></div>
+        </label>
+        <label class="f" id="objWrap"><span>优化目标</span>
+          <select id="objSel">
+            <option value="balanced">均衡：满足货值门槛，体积+重量都装最满</option>
+            <option value="value">货值最高</option>
+            <option value="ratio">按我设的比例放到最多</option>
+          </select>
+        </label>
+        <label class="f" id="shareWrap"><span>每种至少占柜容 %</span><input type="number" id="minShare" class="w50" min="0" max="50" step="1"></label>
+      </div>
+      <div class="row">
+        <button class="btn pri" id="runBtn">计算装柜</button>
+        <button class="btn" id="savePlan">保存方案</button>
+        <select id="loadPlan"><option value="">载入已存方案…</option></select>
+      </div>
+    </div>
+    <div id="planMsg"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>选货 <span class="hint" id="pickHint"></span></h2>
+      <div class="scroll"><table id="pickTable"></table></div>
+      <div class="note" id="pickNote"></div>
+    </div>
+    <div class="card">
+      <h2>装柜结果 <span class="hint" id="resHint"></span></h2>
+      <div class="kpis" id="kpis"></div>
+      <div id="view3d"><div class="tip">拖动旋转 · 滚轮缩放 · 右键平移</div></div>
+      <div class="legend" id="legend"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn sm" data-cam="iso">斜视</button><button class="btn sm" data-cam="top">俯视</button>
+        <button class="btn sm" data-cam="side">侧视</button><button class="btn sm" data-cam="back">从柜门看</button>
+        <label class="row" style="gap:8px;font-size:13px;margin-left:auto"><input type="checkbox" id="showShell" checked>显示箱体</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>各柜型能装多少 <span class="hint">单一货物满柜数量（按实际摆放算，不是简单体积除法）· 当前组合在各柜型的情况</span></h2>
+    <div class="scroll"><table id="compareTable"></table></div>
+  </div>
+</section>
+
+<!-- ============ 成本分摊 ============ -->
+<section class="tab" id="tab-cost">
+  <h1 class="ltitle">成本分摊</h1><p class="lsub">费用按 W/M 计费吨、货值或件数摊到每箱</p>
+  <div class="card">
+    <h2>本柜费用 <span class="hint">每项可选币种和分摊方式；海运费跟柜型走（在“设置”里改各柜型运价）</span></h2>
+    <div class="scroll"><table id="costTable"></table></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="addCost">＋ 加一项费用</button>
+      <label class="row" style="gap:8px"><input type="checkbox" id="insOn">自动算保险：货值+运费 ×<input type="number" id="insMarkup" class="w50" step="1">% × 费率<input type="number" id="insRate" class="w50" step="0.05">%</label>
+    </div>
+    <div class="note">分摊方式：<b>W/M 计费吨</b> = 体积(m³) 和 重量(吨，按设置里的“1 m³ = ? kg”换算) 取大——轻货按体积摊，重货按重量摊；货值 / 件数 / 体积 / 重量 按比例摊。</div>
+  </div>
+  <div class="card">
+    <h2>总成本</h2>
+    <div class="kpis" id="costKpis"></div>
+    <div id="costMsg"></div>
+  </div>
+  <div class="card">
+    <h2>每种货的落地成本 <span class="hint">金额均为加币 CAD</span>
+      <span style="margin-left:auto" class="row"><label class="row" style="gap:4px;font-size:12px;color:var(--muted)">目标毛利率<input type="number" id="margin" class="w50" step="1">%</label><button class="btn sm" id="exportCsv">复制表格</button></span>
+    </h2>
+    <div class="scroll"><table id="landedTable"></table></div>
+    <div class="note">关税完税价按货价（视为 FOB 价）计；GST = (完税价 + 关税 + 附加税) × GST%。GST 注册企业可以申报进项抵扣（ITC），所以默认<b>不计入</b>落地成本，但计入现金支出——可在设置里改。</div>
+  </div>
+</section>
+
+<!-- ============ 设置 ============ -->
+<section class="tab" id="tab-settings">
+  <h1 class="ltitle">设置</h1><p class="lsub">汇率、计算规则、柜型和数据备份</p>
+  <div class="grid2">
+    <div class="card">
+      <h2>汇率 <span class="hint">1 单位外币 = ? 加币</span></h2>
+      <div class="row" id="rateBox"></div>
+      <div class="row" style="margin-top:10px"><a class="btn" href="https://www.bankofcanada.ca/rates/exchange/daily-exchange-rates/" target="_blank" rel="noopener">查加拿大央行今日汇率 ↗</a><span class="note" id="rateDate" style="margin:0"></span></div>
+    </div>
+    <div class="card">
+      <h2>计算规则</h2>
+      <div class="row">
+        <label class="f"><span>W/M：1 m³ 对应 kg</span><input type="number" id="wmRatio" step="50"></label>
+        <label class="f"><span>GST %</span><input type="number" id="gst" step="0.5"></label>
+        <label class="f"><span>GST 计入落地成本</span><select id="gstInCost"><option value="0">否（可抵扣）</option><option value="1">是</option></select></label>
+        <label class="f"><span>装箱效率目标 %</span><input type="number" id="eff" step="1"></label>
+      </div>
+      <h2 style="margin-top:16px">货值门槛 <span class="hint">一柜货最少值多少钱才划算</span></h2>
+      <div class="row">
+        <label class="f"><span>方式</span><select id="minMode"><option value="ratio">按物流费占货值比例</option><option value="fixed">固定金额</option></select></label>
+        <label class="f" id="mvRatioW"><span>物流费 ≤ 货值的 %</span><input type="number" id="minRatio" step="1"></label>
+        <label class="f" id="mvFixedW"><span>最低货值 CAD</span><input type="number" id="minFixed" step="1000" class="w120"></label>
+      </div>
+      <div class="note">行业上没有统一的“最低货值”，常用的判断是看<b>物流费（海运+两头港杂+拖车+清关）占货值的比例</b>：低于 10% 很健康，10–15% 可以接受，超过 20% 通常说明货太便宜或太泡，不值得单独走一个柜。系统默认用 15%：门槛 = 本柜物流费 ÷ 15%，物流费变了门槛会自动跟着变。</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>柜型 <span class="hint">内尺寸（cm）、可装重量（kg）、海运费；可以加自定义柜型</span></h2>
+    <div class="scroll"><table id="ctTable"></table></div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="addCt">＋ 自定义柜型</button></div>
+    <div class="note">默认是常见内尺寸。可装重量要按船公司和陆运实际限制填：港口到仓库的陆运限重往往比柜子本身的额定载重更低，订舱前和货代确认。海运费只是参考值，按实际报价改。</div>
+  </div>
+  <div class="card">
+    <h2>我的 HS 库 <span class="hint">核实过的编码和税率</span></h2>
+    <div class="scroll"><table id="hsLibTable"></table></div>
+  </div>
+  <div class="card">
+    <h2>数据</h2>
+    <div class="row">
+      <button class="btn" id="exportJson">备份：复制全部数据</button>
+      <button class="btn" id="importPaste">恢复：粘贴备份</button>
+      <label class="btn">从文件恢复<input type="file" id="importJson" accept=".json,.txt" hidden></label>
+      <button class="btn del" id="resetAll">清空并恢复示例</button>
+    </div>
+    <div class="note">数据只存在这台设备的这个浏览器里（微信里打开就存在微信里，清理微信缓存会丢）。定期点“备份”，把复制的内容发到微信“文件传输助手”保存；换设备时用“粘贴备份”恢复。以后做成 App 也用这份数据导入。</div>
+  </div>
+</section>
+</main>
+<div id="modal" hidden><div class="mbox" role="dialog" aria-modal="true"><h3 id="mTitle"></h3><div class="mbody" id="mBody"></div><div class="mbtns" id="mBtns"></div></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/javascript-lp-solver@0.4.24/prod/solver.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
