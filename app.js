@@ -174,13 +174,12 @@ $('#nav').addEventListener('click', e => {
 const sel = (opts, v) => opts.map(o => `<option${o === v ? ' selected' : ''}>${o}</option>`).join('');
 function renderProducts(){
   const t = $('#prodTable');
-  let h = `<tr><th></th><th>品名</th><th>HS 编码</th><th class="n">关税%</th><th class="n">附加税%</th><th>长 × 宽 × 高</th><th></th><th class="n">单箱毛重</th><th></th><th class="n">单箱价格</th><th></th><th class="n">m³/箱</th><th class="n">密度 kg/m³</th><th>可侧放</th><th></th></tr>`;
+  let h = `<tr><th>品名</th><th>HS 编码</th><th class="n">关税%</th><th class="n">附加税%</th><th>长 × 宽 × 高</th><th></th><th class="n">单箱毛重</th><th></th><th class="n">单箱价格</th><th></th><th class="n">m³/箱</th><th class="n">密度 kg/m³</th><th>可侧放</th><th></th></tr>`;
   S.products.forEach(p => {
     const n = nprod(p), dens = n.cbm > 0 ? n.kg / n.cbm : 0;
     const heavy = dens > S.settings.wmRatio;
     h += `<tr data-id="${p.id}">
-      <td><input type="color" data-k="color" value="${p.color}" style="width:28px;height:24px;padding:0;border:0"></td>
-      <td><input data-k="name" class="w160" value="${esc(p.name)}"></td>
+      <td><div class="nm"><input type="color" data-k="color" value="${p.color}" aria-label="颜色"><input data-k="name" class="w160" value="${esc(p.name)}" title="${esc(p.name)}"></div></td>
       <td><input data-k="hs" class="w120 mono" value="${esc(p.hs)}" placeholder="0000.00"> ${p.hsChecked ? '<span class="badge ok">已核实</span>' : '<span class="badge warn">待核实</span>'}</td>
       <td class="n"><input type="number" data-k="dutyRate" class="w50" step="0.5" value="${p.dutyRate}"></td>
       <td class="n"><input type="number" data-k="surtaxRate" class="w50" step="0.5" value="${p.surtaxRate}"></td>
@@ -265,13 +264,12 @@ function renderPlan(){
   $('#objWrap').style.display = auto ? '' : 'none';
   $('#shareWrap').style.display = auto && S.plan.objective !== 'ratio' ? '' : 'none';
   const ratio = auto && S.plan.objective === 'ratio';
-  let h = `<tr><th>用</th><th>货物</th>${auto ? (ratio ? '<th class="n">比例</th>' : '<th class="n">最少</th><th class="n">最多</th>') : '<th class="n">数量（箱）</th>'}<th class="n">结果</th><th class="n">m³</th><th class="n">kg</th><th class="n">货值 CAD</th></tr>`;
+  let h = `<tr><th>货物</th>${auto ? (ratio ? '<th class="n">比例</th>' : '<th class="n">最少</th><th class="n">最多</th>') : '<th class="n">数量（箱）</th>'}<th class="n">结果</th><th class="n">m³</th><th class="n">kg</th><th class="n">货值 CAD</th></tr>`;
   const last = S.last && S.last.ctId === S.plan.ctId ? S.last : null;
   S.products.forEach(p => {
     const r = prow(p.id), n = nprod(p);
     const got = last ? (last.qty[p.id] || 0) : 0, want = last && last.want ? (last.want[p.id] || 0) : got;
-    h += `<tr data-id="${p.id}"><td><input type="checkbox" data-k="on" ${r.on ? 'checked' : ''}></td>
-      <td><span class="swatch" style="background:${p.color}"></span>${esc(p.name)}</td>
+    h += `<tr data-id="${p.id}"><td><div class="nm"><input type="checkbox" data-k="on" ${r.on ? 'checked' : ''} aria-label="装这个货"><span class="swatch" style="background:${p.color}"></span><span class="nmt" title="${esc(p.name)}">${esc(p.name)}</span></div></td>
       ${auto ? (ratio ? `<td class="n"><input type="number" data-k="ratio" class="w50" min="0" step="1" value="${r.ratio}"></td>`
         : `<td class="n"><input type="number" data-k="min" class="w50" min="0" placeholder="0" value="${r.min}"></td><td class="n"><input type="number" data-k="max" class="w50" min="0" placeholder="不限" value="${r.max}"></td>`)
         : `<td class="n"><input type="number" data-k="qty" min="0" value="${r.qty || 0}"></td>`}
@@ -544,8 +542,8 @@ function renderSettings(){
   ['wmRatio','gst','eff','minRatio','minFixed'].forEach(k => $('#' + k).value = s[k]);
   $('#gstInCost').value = s.gstInCost ? '1' : '0'; $('#minMode').value = s.minMode;
   $('#mvRatioW').style.display = s.minMode === 'ratio' ? '' : 'none'; $('#mvFixedW').style.display = s.minMode === 'fixed' ? '' : 'none';
-  $('#ctTable').innerHTML = `<tr><th>显示</th><th>名称</th><th class="n">内长 cm</th><th class="n">内宽 cm</th><th class="n">内高 cm</th><th class="n">容积 m³</th><th class="n">可装重量 kg</th><th class="n">海运费</th><th>币种</th><th></th></tr>` +
-    S.containers.map(c => `<tr data-id="${c.id}"><td><input type="checkbox" data-k="on" ${c.on !== false ? 'checked' : ''}></td><td><input data-k="name" class="w120" value="${esc(c.name)}"></td>
+  $('#ctTable').innerHTML = `<tr><th>柜型</th><th class="n">内长 cm</th><th class="n">内宽 cm</th><th class="n">内高 cm</th><th class="n">容积 m³</th><th class="n">可装重量 kg</th><th class="n">海运费</th><th>币种</th><th></th></tr>` +
+    S.containers.map(c => `<tr data-id="${c.id}"><td><div class="nm"><input type="checkbox" data-k="on" ${c.on !== false ? 'checked' : ''} aria-label="显示"><input data-k="name" class="w120" value="${esc(c.name)}"></div></td>
       ${['L','W','H'].map(k => `<td class="n"><input type="number" data-k="${k}" step="0.1" value="${c[k]}"></td>`).join('')}<td class="n">${fmt(c.L * c.W * c.H / 1e6, 1)}</td>
       <td class="n"><input type="number" data-k="payload" step="100" value="${c.payload}"></td><td class="n"><input type="number" data-k="freight" value="${c.freight}"></td>
       <td><select data-k="freightCur">${sel(currencies(), c.freightCur)}</select></td><td>${['20gp','40gp','40hq'].includes(c.id) ? '' : '<button class="btn sm del" data-a="del">删除</button>'}</td></tr>`).join('');
@@ -591,6 +589,7 @@ function renderAll(){
 renderProducts(); renderSaved();
 window.__S = () => S;
 
+document.addEventListener('scroll', e => { const el = e.target; if (el.classList && el.classList.contains('scroll')) el.classList.toggle('scrolled', el.scrollLeft > 2); }, true);
 /* ---------- 只读模式 ---------- */
 const RO_OK = ['hsQuery', 'showShell', 'ctSel', 'loadPlan'];
 function applyRO(){
