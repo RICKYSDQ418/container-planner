@@ -117,10 +117,6 @@ function defaults(){
 }
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)) || defaults(); } catch (e) { S = defaults(); }
-const D0 = defaults();
-S.settings = Object.assign({}, D0.settings, S.settings); S.settings.ins = Object.assign({}, D0.settings.ins, S.settings.ins);
-['containers','products','costs','saved'].forEach(k => { if (!Array.isArray(S[k])) S[k] = D0[k]; });
-S.plan = Object.assign({}, D0.plan, S.plan); S.hsLib = S.hsLib || {};
 /* 新增货物（按 id 合并，不覆盖已有数据；删掉后不会再加回来） */
 const SEED = [
   { id: 'seed-roll-50x25', added: '2026-10-28', name: '泡沫条 6000×50×25mm（10卷/箱）', hs: '3921.19', dutyRate: 0, surtaxRate: 0, hsChecked: true, L: 42, W: 42, H: 52, dimUnit: 'cm', weight: 0, wtUnit: 'kg', price: 40.5, currency: 'USD', color: '#7a5ab8' },
@@ -132,6 +128,12 @@ const SEED = [
   /* 2026-11-09 第二份报价：110g/㎡(±5%) 灰/黑 1.22m×76.2m=93㎡/卷；20GP 49卷/托×18托=882卷；EXW 含税 CNY 225/卷；FOB 上海 USD 30.58/卷。单卷重按 93㎡×110g 计 */
   { id: 'seed-uw-110-gb', added: '2026-11-09', name: '卷材 110GSM 灰/黑 1.22×76.2m（49卷/托，FOB 上海）', hs: '', dutyRate: 0, surtaxRate: 0, hsChecked: false, L: 122, W: 16.3, H: 16.3, dimUnit: 'cm', weight: 10.23, wtUnit: 'kg', price: 30.58, currency: 'USD', color: '#5b6770' },
 ];
+const D0 = defaults();
+function normalize(){
+const before = JSON.stringify(S.seeded || {});
+S.settings = Object.assign({}, D0.settings, S.settings); S.settings.ins = Object.assign({}, D0.settings.ins, S.settings.ins);
+['containers','products','costs','saved'].forEach(k => { if (!Array.isArray(S[k])) S[k] = D0[k]; });
+S.plan = Object.assign({}, D0.plan, S.plan); S.hsLib = S.hsLib || {};
 S.seeded = S.seeded || {};
 SEED.forEach(p => { if (!S.seeded[p.id]) { S.seeded[p.id] = 1; if (!S.products.some(x => x.id === p.id)) S.products.push(Object.assign({}, p)); } });
 /* 2026-10-28：泡沫条确认为塑料泡沫，HS 3921.19，MFN 免税（CBSA 2026 税则） */
@@ -140,8 +142,18 @@ if (!S.seeded['foam-hs-v2']) {
   SEED.filter(sd => sd.id.startsWith('seed-roll-')).forEach(sd => { const p = S.products.find(x => x.id === sd.id); if (p) { p.name = sd.name; p.hs = '3921.19'; p.dutyRate = 0; p.surtaxRate = 0; p.hsChecked = true; } });
   if (!S.hsLib['3921.19']) S.hsLib['3921.19'] = { duty: 0, surtax: 0, desc: '塑料泡沫条/片（PE 等，非聚氨酯）', date: '2026-10-28' };
 }
+S.saved.forEach(x => { if (!x.id) x.id = uid(); });
+return JSON.stringify(S.seeded) !== before;
+}
+normalize();
 let saveT;
-function save(){ clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }, 200); }
+let RO = false;          // 只读（查看者）
+let CLOUD = null;        // 云同步状态，见文件末尾
+function save(){
+  clearTimeout(saveT);
+  if (CLOUD) { if (!CLOUD.ready || RO) return; CLOUD.dirty = true; setSync('saving'); saveT = setTimeout(cloudPush, 500); return; }
+  saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }, 200);
+}
 const currencies = () => Object.keys(S.settings.rates);
 const ct = () => S.containers.find(c => c.id === S.plan.ctId) || S.containers[0];
 const prodById = id => S.products.find(p => p.id === id);
@@ -226,7 +238,7 @@ function hsSearch(){
 }
 $('#hsQuery').addEventListener('input', hsSearch);
 $('#hsResults').addEventListener('click', e => {
-  const d = e.target.closest('div[data-code]'); if (!d) return;
+  const d = e.target.closest('div[data-code]'); if (!d || RO) return;
   UI.pick(`把 HS ${d.dataset.code} 套用到哪个货物？`, S.products.map(p => p.name)).then(k => {
     const p = S.products[k]; if (k == null || !p) return;
     p.hs = d.dataset.code;
@@ -361,11 +373,11 @@ function renderCompare(){
 }
 
 /* 方案保存 */
-function renderSaved(){ $('#loadPlan').innerHTML = '<option value="">载入已存方案…</option>' + S.saved.map((s, i) => `<option value="${i}">${esc(s.name)}</option>`).join('') + (S.saved.length ? '<option value="del">删除一个方案…</option>' : ''); }
+function renderSaved(){ $('#loadPlan').innerHTML = '<option value="">载入已存方案…</option>' + S.saved.map((s, i) => `<option value="${i}">${esc(s.name)}</option>`).join('') + (S.saved.length && !RO ? '<option value="del">删除一个方案…</option>' : ''); }
 $('#savePlan').onclick = () => {
   UI.prompt('方案名称', `${ct().name} ${new Date().toLocaleDateString('zh-CN')}`).then(name => {
     if (!name) return;
-    S.saved.push({ name, plan: JSON.parse(JSON.stringify(S.plan)), last: S.last, costs: JSON.parse(JSON.stringify(S.costs)) });
+    S.saved.push({ id: uid(), name, plan: JSON.parse(JSON.stringify(S.plan)), last: S.last, costs: JSON.parse(JSON.stringify(S.costs)) });
     save(); renderSaved(); UI.alert('已保存「' + name + '」');
   });
 };
@@ -561,7 +573,7 @@ $('#tab-settings').addEventListener('click', e => {
 });
 $('#addCt').onclick = () => { S.containers.push({ id: uid(), name: '自定义柜', L: 1200, W: 235, H: 260, payload: 26000, freight: 0, freightCur: 'USD', on: true }); save(); renderSettings(); };
 $('#exportJson').onclick = () => UI.text('数据备份 ' + new Date().toISOString().slice(0, 10), '点“复制”，然后粘贴发到微信“文件传输助手”保存。恢复时用“粘贴备份”。', JSON.stringify(S));
-function restore(t){ try { const d = JSON.parse(t); if (!d || !Array.isArray(d.products)) throw new Error(); S = d; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} location.reload(); } catch (e) { UI.alert('内容格式不对，请粘贴完整的备份文本（以 { 开头）。'); } }
+function restore(t){ try { const d = JSON.parse(t); if (!d || !Array.isArray(d.products)) throw new Error(); S = d; normalize(); if (CLOUD) { save(); renderAll(); UI.alert('已恢复，并同步到云端。'); return; } try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} location.reload(); } catch (e) { UI.alert('内容格式不对，请粘贴完整的备份文本（以 { 开头）。'); } }
 $('#importPaste').onclick = () => UI.prompt('粘贴备份内容', '', true).then(t => { if (t) UI.confirm('恢复备份会覆盖当前所有数据，继续？', '覆盖并恢复').then(ok => ok && restore(t.trim())); });
 $('#importJson').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
@@ -570,6 +582,177 @@ $('#importJson').onchange = e => {
 $('#resetAll').onclick = () => UI.confirm('清空所有数据并恢复示例？建议先备份。', '清空').then(ok => { if (!ok) return; try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); });
 
 /* ---------- 启动 ---------- */
+function activeTab(){ const b = $('#nav button.on'); return b ? b.dataset.t : 'products'; }
+function renderAll(){
+  renderSaved();
+  const t = activeTab();
+  if (t === 'products') renderProducts(); else if (t === 'plan') renderPlan(); else if (t === 'cost') renderCost(); else renderSettings();
+}
 renderProducts(); renderSaved();
 window.__S = () => S;
+
+/* ---------- 只读模式 ---------- */
+const RO_OK = ['hsQuery', 'showShell', 'ctSel', 'loadPlan'];
+function applyRO(){
+  document.body.classList.toggle('ro', RO);
+  $('#roBar').hidden = !RO;
+  if (!RO) return;
+  $$('main input, main select, main textarea').forEach(el => { if (!RO_OK.includes(el.id)) el.disabled = true; });
+}
+let roQueued = false;
+new MutationObserver(() => { if (RO && !roQueued) { roQueued = true; queueMicrotask(() => { roQueued = false; applyRO(); }); } }).observe($('main'), { childList: true, subtree: true });
+
+/* ---------- 同步状态小标签 ---------- */
+function setSync(st){
+  const p = $('#syncPill'); if (!CLOUD) { p.hidden = true; return; }
+  if (st && st !== 'ro') CLOUD.st = st;
+  const k = RO ? 'ro' : (!navigator.onLine ? 'off' : CLOUD.st || 'loading');
+  const txt = { ro: '只读', off: '离线', ok: '已同步', saving: '保存中…', loading: '同步中…', err: '同步失败' }[k];
+  p.hidden = false; p.className = 'pill ' + k; p.querySelector('b').textContent = txt;
+}
+addEventListener('online', () => setSync()); addEventListener('offline', () => setSync());
+
+/* ---------- 云同步（Firebase Firestore） ----------
+   planner/config   设置、柜型、费用、HS 库
+   planner/current  当前装柜方案和结果
+   products/{id}    每种货物一条
+   plans/{id}       保存的方案
+   只改动过的那几条才会写入；只有在本机明确删除的货物/方案才会从云端删除。 */
+if (window.FIREBASE_CONFIG && window.firebase && firebase.firestore && firebase.auth) (function(){
+  firebase.initializeApp(window.FIREBASE_CONFIG);
+  const auth = firebase.auth(), db = firebase.firestore();
+  try { db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (e) {}
+  const C = CLOUD = { auth, db, user: null, ready: false, dirty: false, st: 'loading', sy: { config: null, current: null, products: {}, plans: {} }, parts: {}, queued: {}, unsub: [], renderLater: false };
+  const clean = o => JSON.parse(JSON.stringify(o === undefined ? null : o));
+  const cfgOf = () => clean({ settings: S.settings, containers: S.containers, costs: S.costs, hsLib: S.hsLib, seeded: S.seeded });
+  const curOf = () => clean({ plan: S.plan, last: S.last || null });
+  const rowOf = (x, i) => clean(Object.assign({}, x, { order: i }));
+  const strip = d => { const o = Object.assign({}, d); delete o.order; return o; };
+  const sortKeys = v => Array.isArray(v) ? v.map(sortKeys) : (v && typeof v === 'object') ? Object.keys(v).sort().reduce((o, k) => (o[k] = sortKeys(v[k]), o), {}) : v;
+  const stable = v => JSON.stringify(sortKeys(v));
+
+  /* 登录 */
+  const showLogin = on => { $('#login').hidden = !on; if (on) setTimeout(() => $('#lEmail').focus(), 50); };
+  $('#loginForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const em = $('#lEmail').value.trim(), pw = $('#lPass').value;
+    if (!em || !pw) { $('#lErr').textContent = '请填写邮箱和密码'; return; }
+    $('#lBtn').disabled = true; $('#lBtn').textContent = '登录中…'; $('#lErr').textContent = '';
+    auth.signInWithEmailAndPassword(em, pw).catch(err => {
+      const m = { 'auth/invalid-credential': '邮箱或密码不对', 'auth/wrong-password': '邮箱或密码不对', 'auth/user-not-found': '没有这个账号，请找管理员开通', 'auth/invalid-email': '邮箱格式不对', 'auth/too-many-requests': '尝试次数太多，请稍后再试', 'auth/network-request-failed': '网络连接失败，请检查网络' }[err.code];
+      $('#lErr').textContent = m || ('登录失败：' + (err.message || err.code));
+    }).finally(() => { $('#lBtn').disabled = false; $('#lBtn').textContent = '登录'; });
+  });
+
+  function renderAcct(){
+    const a = $('#acct'); a.hidden = false;
+    a.innerHTML = `<span>已登录：<b>${esc(C.user.email || '')}</b></span><span class="badge ${RO ? '' : 'ok'}">${RO ? '只读' : '可编辑'}</span><button class="btn sm" id="logout">退出登录</button>`;
+    $('#logout').onclick = () => UI.confirm('退出登录？', '退出').then(ok => ok && auth.signOut());
+    $('#dataNote').innerHTML = '数据保存在云端，电脑、手机打开看到的都是同一份，改动几秒内同步。“备份”仍然可以用来留一份底。';
+    $('#resetAll').hidden = true;
+    $('#prodHint').textContent = '每种货录一次，单位、币种可以各自选；数据保存在云端，自动同步';
+  }
+
+  /* 远端 → 本机 */
+  function applyPart(name, data, force){
+    if (name === 'config') {
+      if (!data) return false;
+      const str = stable(data); if (str === C.sy.config && !force) return false;
+      ['settings', 'containers', 'costs', 'hsLib', 'seeded'].forEach(k => { if (data[k] !== undefined) S[k] = data[k]; });
+      C.sy.config = str; return true;
+    }
+    if (name === 'current') {
+      if (!data) return false;
+      const str = stable(data); if (str === C.sy.current && !force) return false;
+      if (data.plan) S.plan = data.plan; S.last = data.last || null;
+      C.sy.current = str; return true;
+    }
+    const key = name === 'products' ? 'products' : 'plans';
+    const map = {}; data.forEach(d => map[d.id] = stable(d));
+    const same = !force && Object.keys(map).length === Object.keys(C.sy[key]).length && Object.keys(map).every(id => map[id] === C.sy[key][id]);
+    if (same) return false;
+    const list = data.slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map(strip);
+    if (name === 'products') S.products = list; else S.saved = list;
+    C.sy[key] = map; return true;
+  }
+  function onRemote(name, data){
+    C.parts[name] = data;
+    if (!C.ready) { tryReady(); return; }
+    if (C.dirty) { C.queued[name] = data; return; }       // 本机有没保存的改动：先保存，再合并
+    if (applyPart(name, data)) { normalize(); requestRender(); }
+  }
+  function requestRender(){
+    const a = document.activeElement;
+    if (a && a.closest && a.closest('main') && /INPUT|SELECT|TEXTAREA/.test(a.tagName) && !RO) { C.renderLater = true; return; }
+    renderAll();
+  }
+  document.addEventListener('focusout', () => { if (C.renderLater) setTimeout(() => { if (C.renderLater && !(document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))) { C.renderLater = false; renderAll(); } }, 0); });
+
+  function tryReady(){
+    const P = C.parts;
+    if (P.config === undefined || P.current === undefined || P.products === undefined || P.plans === undefined || C.role === undefined) return;
+    if (P.config === null) {
+      if (RO) { $('#planMsg').innerHTML = ''; UI.alert('云端还没有数据。请管理员先登录一次，数据会自动上传。'); C.ready = true; setSync('ok'); return; }
+      // 第一次：把本机现有的数据整份上传
+      C.ready = true; normalize(); C.dirty = true; cloudPush(); renderAll();
+      UI.alert('第一次登录：已把这台设备上的数据上传到云端。以后电脑、手机都用这份。');
+      return;
+    }
+    ['config', 'current', 'products', 'plans'].forEach(n => applyPart(n, P[n], true));
+    if (normalize() && !RO) { C.ready = true; save(); } else C.ready = true;
+    renderAll(); setSync('ok');
+  }
+
+  /* 本机 → 远端（只写变动的部分） */
+  window.cloudPush = function(){
+    clearTimeout(saveT);
+    if (RO || !C.ready) return;
+    const sy = C.sy, b = db.batch(), wrote = {}; let n = 0;
+    const cfg = cfgOf(), cs = stable(cfg);
+    if (cs !== sy.config) { b.set(db.doc('planner/config'), cfg); sy.config = cs; wrote.config = 1; n++; }
+    const cur = curOf(), us = stable(cur);
+    if (us !== sy.current) { b.set(db.doc('planner/current'), cur); sy.current = us; wrote.current = 1; n++; }
+    [['products', S.products, 'products'], ['plans', S.saved, 'plans']].forEach(([coll, list, key]) => {
+      const seen = {};
+      list.forEach((x, i) => {
+        if (!x.id) x.id = uid();
+        const o = rowOf(x, i), str = stable(o); seen[x.id] = 1;
+        if (sy[key][x.id] !== str) { b.set(db.collection(coll).doc(x.id), o); sy[key][x.id] = str; wrote[key] = 1; n++; }
+      });
+      Object.keys(sy[key]).forEach(id => { if (!seen[id]) { b.delete(db.collection(coll).doc(id)); delete sy[key][id]; wrote[key] = 1; n++; } });
+    });
+    C.dirty = false;
+    const q = C.queued; C.queued = {};
+    Object.keys(q).forEach(name => { if (!wrote[name] && applyPart(name, q[name])) { normalize(); requestRender(); } });
+    if (!n) { setSync('ok'); return; }
+    b.commit().then(() => setSync('ok')).catch(err => {
+      setSync('err');
+      UI.alert(err && err.code === 'permission-denied' ? '保存失败：这个账号没有修改权限。' : '保存到云端失败：' + ((err && err.message) || err) + '\n联网后再改一次即可重试。');
+    });
+  };
+
+  function listen(){
+    const onErr = err => { setSync('err'); if (err && err.code === 'permission-denied') UI.alert('这个账号没有查看权限，请联系管理员。'); };
+    C.unsub.push(db.doc('planner/config').onSnapshot(d => onRemote('config', d.exists ? d.data() : null), onErr));
+    C.unsub.push(db.doc('planner/current').onSnapshot(d => onRemote('current', d.exists ? d.data() : null), onErr));
+    C.unsub.push(db.collection('products').onSnapshot(q => onRemote('products', q.docs.map(d => Object.assign({ id: d.id }, d.data()))), onErr));
+    C.unsub.push(db.collection('plans').onSnapshot(q => onRemote('plans', q.docs.map(d => Object.assign({ id: d.id }, d.data()))), onErr));
+  }
+
+  auth.onAuthStateChanged(user => {
+    C.unsub.forEach(f => { try { f(); } catch (e) {} }); C.unsub = [];
+    C.ready = false; C.parts = {}; C.queued = {}; C.dirty = false; C.sy = { config: null, current: null, products: {}, plans: {} }; C.role = undefined;
+    C.user = user;
+    if (!user) { showLogin(true); $('#syncPill').hidden = true; return; }
+    showLogin(false); RO = true; applyRO(); setSync('loading');
+    // 判断有没有修改权限：试写一条“最近打开”记录（规则只允许管理员写）
+    let done = false;
+    const finish = editor => { if (done) return; done = true; C.role = editor ? 'editor' : 'viewer'; RO = !editor; applyRO(); renderAcct(); renderSaved(); setSync(); tryReady(); };
+    db.doc('planner/access').set({ ['open_' + user.uid]: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+      .then(() => finish(true), () => finish(false));
+    setTimeout(() => finish(false), 8000);   // 没网时先按只读打开
+    listen();
+  });
+  showLogin(false);
+})();
 })();

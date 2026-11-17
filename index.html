@@ -165,6 +165,31 @@ a.btn{text-decoration:none}
 #modal .mbtns .btn.pri{font-weight:600;background:transparent;color:var(--accent)}
 #modal .mbtns .btn:active{background:var(--fill);transform:none}
 
+/* 同步状态、登录页、只读模式 */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:var(--muted);background:var(--fill);border-radius:20px;padding:3px 10px;white-space:nowrap}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none}
+.pill.ok .dot{background:var(--good)}.pill.saving .dot{background:var(--warn)}.pill.err .dot,.pill.off .dot{background:var(--bad)}
+.pill.ro{color:var(--indigo);background:color-mix(in srgb,var(--indigo) 12%,transparent)}.pill.ro .dot{background:var(--indigo)}
+#login{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+#login .lbox{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+#login .licon{width:72px;height:72px;border-radius:17px;background:linear-gradient(160deg,#5ac8fa,#007aff);display:grid;place-items:center;margin-bottom:10px;box-shadow:0 8px 24px rgba(0,122,255,.25)}
+#login .licon svg{width:42px;height:42px;stroke:#fff}
+#login h2{font:700 28px/1.2 var(--font-d);margin:0}
+#login p{margin:0 0 18px;color:var(--muted)}
+#login form{width:100%;display:flex;flex-direction:column;gap:0;background:var(--panel);border-radius:12px;overflow:hidden}
+#login input{width:100%;border-radius:0;background:transparent;padding:14px 16px;font-size:17px}
+#login input+input{border-top:.5px solid var(--line)}
+#login input:focus{box-shadow:none;background:var(--soft)}
+#login .lbtn{width:100%;margin-top:16px;padding:13px;font-size:17px;border-radius:12px}
+#login .lerr{min-height:20px;color:var(--bad);font-size:14px;margin-top:10px}
+body.ro #addProd,body.ro #addCost,body.ro #addCt,body.ro #addCur,body.ro #runBtn,body.ro #savePlan,body.ro #importPaste,body.ro label.btn,body.ro #resetAll,
+body.ro #prodTable button,body.ro #costTable button,body.ro #ctTable button,body.ro #hsLibTable button{display:none!important}
+body.ro #modeSeg{pointer-events:none;opacity:.6}
+body.ro main input:disabled,body.ro main select:disabled{opacity:1;color:var(--ink);-webkit-text-fill-color:var(--ink)}
+body.ro main input[type=checkbox]:disabled{opacity:.55}
+.robar{display:flex;gap:8px;align-items:center;background:color-mix(in srgb,var(--indigo) 10%,transparent);color:var(--indigo);border-radius:12px;padding:10px 14px;font-size:14px;margin:0 0 16px}
+.acct{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;font-size:14px}
+
 /* 手机：底部标签栏 */
 @media(max-width:700px){
   header{justify-content:center;min-height:44px;-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--bar-solid)}
@@ -188,7 +213,7 @@ a.btn{text-decoration:none}
 </head>
 <body>
 <header>
-  <div class="brand"><i><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><path d="M7 9v6M10.5 9v6M14 9v6M17.5 9v6"/></svg></i>装柜计算器</div>
+  <div class="brand"><i><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><path d="M7 9v6M10.5 9v6M14 9v6M17.5 9v6"/></svg></i>装柜计算器 <span id="syncPill" class="pill" hidden><span class="dot"></span><b style="font-weight:500"></b></span></div>
   <nav id="nav">
     <button data-t="products" class="on"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg><span>货物库</span></button>
     <button data-t="plan"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><path d="M7 9v6M10.5 9v6M14 9v6M17.5 9v6"/></svg><span>装柜</span></button>
@@ -197,12 +222,13 @@ a.btn{text-decoration:none}
   </nav>
 </header>
 <main>
+<div id="roBar" class="robar" hidden>只读模式：你可以查看所有数据，修改由管理员负责。</div>
 
 <!-- ============ 货物库 ============ -->
 <section class="tab on" id="tab-products">
   <h1 class="ltitle">货物库</h1><p class="lsub">整柜配货 · 3D 摆放 · 运费分摊 · 落地成本</p>
   <div class="card">
-    <h2>我的货物 <span class="hint">每种货录一次，单位、币种可以各自选；数据自动保存在本机浏览器</span></h2>
+    <h2>我的货物 <span class="hint" id="prodHint">每种货录一次，单位、币种可以各自选；数据自动保存在本机浏览器</span></h2>
     <div class="row" style="margin-bottom:10px">
       <button class="btn pri" id="addProd">＋ 新增货物</button>
       <span class="note" style="margin:0">尺寸填 <b>外箱/捆/托</b> 的尺寸，重量填 <b>单箱毛重</b>，价格填 <b>单箱价格</b>。</span>
@@ -338,18 +364,30 @@ a.btn{text-decoration:none}
   </div>
   <div class="card">
     <h2>数据</h2>
+    <div id="acct" class="acct" hidden></div>
     <div class="row">
       <button class="btn" id="exportJson">备份：复制全部数据</button>
       <button class="btn" id="importPaste">恢复：粘贴备份</button>
       <label class="btn">从文件恢复<input type="file" id="importJson" accept=".json,.txt" hidden></label>
       <button class="btn del" id="resetAll">清空并恢复示例</button>
     </div>
-    <div class="note">数据只存在这台设备的这个浏览器里（微信里打开就存在微信里，清理微信缓存会丢）。定期点“备份”，把复制的内容发到微信“文件传输助手”保存；换设备时用“粘贴备份”恢复。以后做成 App 也用这份数据导入。</div>
+    <div class="note" id="dataNote">数据只存在这台设备的这个浏览器里（微信里打开就存在微信里，清理微信缓存会丢）。定期点“备份”，把复制的内容发到微信“文件传输助手”保存；换设备时用“粘贴备份”恢复。以后做成 App 也用这份数据导入。</div>
   </div>
 </section>
 </main>
+<div id="login" hidden><div class="lbox">
+  <div class="licon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><path d="M7 9v6M10.5 9v6M14 9v6M17.5 9v6"/></svg></div>
+  <h2>装柜计算器</h2><p>登录后，电脑、手机看到的是同一份数据</p>
+  <form id="loginForm" novalidate><input id="lEmail" type="email" autocomplete="username" placeholder="邮箱" required><input id="lPass" type="password" autocomplete="current-password" placeholder="密码" required></form>
+  <button class="btn pri lbtn" id="lBtn" form="loginForm" type="submit">登录</button>
+  <div class="lerr" id="lErr" role="alert"></div>
+</div></div>
 <div id="modal" hidden><div class="mbox" role="dialog" aria-modal="true"><h3 id="mTitle"></h3><div class="mbody" id="mBody"></div><div class="mbtns" id="mBtns"></div></div></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/javascript-lp-solver@0.4.24/prod/solver.js"></script>
